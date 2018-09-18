@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 	"github.com/inconshreveable/go-update"
 )
 
-func uncompressAndUpdate(src io.ReadCloser, assetURL, cmdPath string) error {
+func (up *Updater) uncompressAndUpdate(src io.ReadCloser, assetURL, cmdPath string) error {
 	defer src.Close()
 
 	_, cmd := filepath.Split(cmdPath)
@@ -22,9 +23,24 @@ func uncompressAndUpdate(src io.ReadCloser, assetURL, cmdPath string) error {
 		return err
 	}
 
+	var signature []byte
+	if up.publicKey != nil {
+		sigURL := strings.TrimSuffix(assetURL, filepath.Ext(cmd)) + ".asc"
+		sigReader, err := up.downloadDirectlyFromURL(sigURL)
+		if err != nil {
+			return err
+		}
+		signature, err = ioutil.ReadAll(sigReader)
+		if err != nil {
+			return err
+		}
+	}
+
 	log.Println("Will update", cmdPath, "to the latest downloaded from", assetURL)
 	return update.Apply(asset, update.Options{
 		TargetPath: cmdPath,
+		PublicKey:  up.publicKey,
+		Signature:  signature,
 	})
 }
 
@@ -67,7 +83,7 @@ func (up *Updater) UpdateTo(rel *Release, cmdPath string) error {
 			return err
 		}
 	}
-	return uncompressAndUpdate(src, rel.AssetURL, cmdPath)
+	return up.uncompressAndUpdate(src, rel.AssetURL, cmdPath)
 }
 
 // UpdateCommand updates a given command binary to the latest version.
@@ -129,7 +145,7 @@ func UpdateTo(assetURL, cmdPath string) error {
 	if err != nil {
 		return err
 	}
-	return uncompressAndUpdate(src, assetURL, cmdPath)
+	return up.uncompressAndUpdate(src, assetURL, cmdPath)
 }
 
 // UpdateCommand updates a given command binary to the latest version.

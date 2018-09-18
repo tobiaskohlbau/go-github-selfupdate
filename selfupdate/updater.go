@@ -2,6 +2,7 @@ package selfupdate
 
 import (
 	"context"
+	"crypto"
 	"net/http"
 	"os"
 
@@ -15,6 +16,8 @@ import (
 type Updater struct {
 	api    *github.Client
 	apiCtx context.Context
+
+	publicKey crypto.PublicKey
 }
 
 // Config represents the configuration of self-update.
@@ -27,6 +30,9 @@ type Config struct {
 	// EnterpriseUploadURL is a URL to upload stuffs to GitHub Enterprise instance. This is often the same as an API base URL.
 	// So if this field is not set and EnterpriseBaseURL is set, EnterpriseBaseURL is also set to this field.
 	EnterpriseUploadURL string
+
+	// Public key to use for signature verification. If nil, no signature verification is done.
+	PublicKey crypto.PublicKey
 }
 
 func newHTTPClient(ctx context.Context, token string) *http.Client {
@@ -52,7 +58,11 @@ func NewUpdater(config Config) (*Updater, error) {
 
 	if config.EnterpriseBaseURL == "" {
 		client := github.NewClient(hc)
-		return &Updater{client, ctx}, nil
+		return &Updater{
+			client,
+			ctx,
+			config.PublicKey,
+		}, nil
 	}
 
 	u := config.EnterpriseUploadURL
@@ -63,7 +73,11 @@ func NewUpdater(config Config) (*Updater, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Updater{client, ctx}, nil
+	return &Updater{
+		client,
+		ctx,
+		config.PublicKey,
+	}, nil
 }
 
 // DefaultUpdater creates a new updater instance with default configuration.
@@ -76,5 +90,8 @@ func DefaultUpdater() *Updater {
 	}
 	ctx := context.Background()
 	client := newHTTPClient(ctx, token)
-	return &Updater{github.NewClient(client), ctx}
+	return &Updater{
+		api:    github.NewClient(client),
+		apiCtx: ctx,
+	}
 }
