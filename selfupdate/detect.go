@@ -12,7 +12,7 @@ import (
 
 var reVersion = regexp.MustCompile(`\d+\.\d+\.\d+`)
 
-func findAssetFromReleasse(rel *github.RepositoryRelease, suffixes []string, targetVersion string) (*github.ReleaseAsset, semver.Version, bool) {
+func findAssetFromReleasse(rel *github.RepositoryRelease, suffixes []string, targetVersion string, prerelease bool) (*github.ReleaseAsset, semver.Version, bool) {
 	if targetVersion != "" && targetVersion != rel.GetTagName() {
 		log.Println("Skip", rel.GetTagName(), "not matching to specified version", targetVersion)
 		return nil, semver.Version{}, false
@@ -22,7 +22,7 @@ func findAssetFromReleasse(rel *github.RepositoryRelease, suffixes []string, tar
 		log.Println("Skip draft version", rel.GetTagName())
 		return nil, semver.Version{}, false
 	}
-	if targetVersion == "" && rel.GetPrerelease() {
+	if !prerelease && targetVersion == "" && rel.GetPrerelease() {
 		log.Println("Skip pre-release version", rel.GetTagName())
 		return nil, semver.Version{}, false
 	}
@@ -59,7 +59,7 @@ func findAssetFromReleasse(rel *github.RepositoryRelease, suffixes []string, tar
 	return nil, semver.Version{}, false
 }
 
-func findReleaseAndAsset(rels []*github.RepositoryRelease, targetVersion string) (*github.RepositoryRelease, *github.ReleaseAsset, semver.Version, bool) {
+func findReleaseAndAsset(rels []*github.RepositoryRelease, targetVersion string, prerelease bool) (*github.RepositoryRelease, *github.ReleaseAsset, semver.Version, bool) {
 	// Generate candidates
 	suffixes := make([]string, 0, 2*7*2)
 	for _, sep := range []rune{'_', '-'} {
@@ -81,7 +81,7 @@ func findReleaseAndAsset(rels []*github.RepositoryRelease, targetVersion string)
 	// Returned list from GitHub API is in the order of the date when created.
 	//   ref: https://github.com/rhysd/go-github-selfupdate/issues/11
 	for _, rel := range rels {
-		if a, v, ok := findAssetFromReleasse(rel, suffixes, targetVersion); ok {
+		if a, v, ok := findAssetFromReleasse(rel, suffixes, targetVersion, prerelease); ok {
 			// Note: any version with suffix is less than any version without suffix.
 			// e.g. 0.0.1 > 0.0.1-beta
 			if release == nil || v.GTE(ver) {
@@ -129,7 +129,7 @@ func (up *Updater) DetectVersion(slug string, version string) (release *Release,
 		return nil, false, err
 	}
 
-	rel, asset, ver, found := findReleaseAndAsset(rels, version)
+	rel, asset, ver, found := findReleaseAndAsset(rels, version, up.preRelease)
 	if !found {
 		return nil, false, nil
 	}

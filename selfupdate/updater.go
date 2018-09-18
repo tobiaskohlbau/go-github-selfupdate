@@ -16,7 +16,7 @@ import (
 type Updater struct {
 	api    *github.Client
 	apiCtx context.Context
-
+	preRelease bool
 	publicKey crypto.PublicKey
 }
 
@@ -30,7 +30,8 @@ type Config struct {
 	// EnterpriseUploadURL is a URL to upload stuffs to GitHub Enterprise instance. This is often the same as an API base URL.
 	// So if this field is not set and EnterpriseBaseURL is set, EnterpriseBaseURL is also set to this field.
 	EnterpriseUploadURL string
-
+	// PreRelease indicates if we could use prerelease as target
+	PreRelease bool
 	// Public key to use for signature verification. If nil, no signature verification is done.
 	PublicKey crypto.PublicKey
 }
@@ -61,6 +62,7 @@ func NewUpdater(config Config) (*Updater, error) {
 		return &Updater{
 			client,
 			ctx,
+			config.PreRelease,
 			config.PublicKey,
 		}, nil
 	}
@@ -76,6 +78,7 @@ func NewUpdater(config Config) (*Updater, error) {
 	return &Updater{
 		client,
 		ctx,
+		config.PreRelease,
 		config.PublicKey,
 	}, nil
 }
